@@ -178,20 +178,32 @@ function lastSentence(){
   return m[m.length-1].trim();
 }
 /* ---- 多篇文章：每篇獨立保存，切換分頁不會互相覆蓋 ---- */
-var ARTICLE_KEY='speak3-articles-v1';
-var ACTIVE_KEY='speak3-active-article-v1';
+/* 新版使用獨立儲存名稱，避免與原版網站互相影響 */
+var ARTICLE_KEY='speak3-plus-articles-v1';
+var ACTIVE_KEY='speak3-plus-active-article-v1';
 var articles=[],activeArticleId='';
 function makeArticle(title,text){
   return {id:'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),title:title,text:text||'',updatedAt:Date.now()};
 }
 function loadArticles(){
-  try{articles=JSON.parse(localStorage.getItem(ARTICLE_KEY)||'[]')}catch(e){articles=[]}
+  try{
+    var saved=localStorage.getItem(ARTICLE_KEY);
+    if(saved){articles=JSON.parse(saved)||[]}
+    else{
+      /* 第一次開啟新版時，複製原版文章作為起始內容；之後兩站各自保存 */
+      var original=localStorage.getItem('speak3-articles-v1');
+      articles=original?JSON.parse(original)||[]:[];
+    }
+  }catch(e){articles=[]}
   if(!Array.isArray(articles))articles=[];
   if(!articles.length){
     var legacy='';try{legacy=localStorage.getItem('zy-text')||''}catch(e){}
     articles=[makeArticle('第一篇文章',legacy)];
   }
-  try{activeArticleId=localStorage.getItem(ACTIVE_KEY)||''}catch(e){}
+  try{
+    activeArticleId=localStorage.getItem(ACTIVE_KEY)||'';
+    if(!activeArticleId)activeArticleId=localStorage.getItem('speak3-active-article-v1')||'';
+  }catch(e){}
   if(!articles.some(function(a){return a.id===activeArticleId}))activeArticleId=articles[0].id;
 }
 function activeArticle(){return articles.find(function(a){return a.id===activeArticleId})||articles[0]}
