@@ -70,6 +70,17 @@ textarea{background:var(--card);line-height:1.7}
 .sub{font-size:clamp(.75rem,2.6vw,1.1rem);color:var(--sub)}
 .tl{display:inline-block}
 #tn{text-align:center;min-height:1.6rem;font-size:1.2rem;color:var(--sub);font-weight:700}
+
+/* ---- 多篇文章分頁 ---- */
+.article-manager{margin:0 0 14px;padding:14px;background:var(--card);border:3px solid var(--line);border-radius:24px;box-shadow:0 6px 0 rgba(255,143,184,.18)}
+.article-manager-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.article-manager-title{font-weight:800;font-size:1.1rem}
+.article-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.article-tab{font-size:.98rem;padding:9px 14px;background:var(--bg);color:var(--ink);border:2px solid var(--line);box-shadow:none;text-shadow:none}
+.article-tab.active{background:linear-gradient(180deg,#dcb9ff,#b588f0);color:#fff;border-color:#b588f0}
+.article-tab small{display:block;font-size:.72rem;color:inherit;opacity:.8}
+.article-title-input{width:100%;margin:8px 0 2px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit}
+.article-status{font-size:.85rem;color:var(--sub);margin-top:8px}
 </style>
 </head>
 <body>
@@ -158,8 +169,85 @@ function lastSentence(){
   if(!m)return '';
   return m[m.length-1].trim();
 }
-function save(){try{localStorage.setItem('zy-text',t.value)}catch(e){}}
-try{t.value=localStorage.getItem('zy-text')||''}catch(e){}
+/* ---- 多篇文章：每篇獨立保存，切換分頁不會互相覆蓋 ---- */
+var ARTICLE_KEY='speak3-articles-v1';
+var ACTIVE_KEY='speak3-active-article-v1';
+var articles=[],activeArticleId='';
+function makeArticle(title,text){
+  return {id:'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),title:title,text:text||'',updatedAt:Date.now()};
+}
+function loadArticles(){
+  try{articles=JSON.parse(localStorage.getItem(ARTICLE_KEY)||'[]')}catch(e){articles=[]}
+  if(!Array.isArray(articles))articles=[];
+  if(!articles.length){
+    var legacy='';try{legacy=localStorage.getItem('zy-text')||''}catch(e){}
+    articles=[makeArticle('第一篇文章',legacy)];
+  }
+  try{activeArticleId=localStorage.getItem(ACTIVE_KEY)||''}catch(e){}
+  if(!articles.some(function(a){return a.id===activeArticleId}))activeArticleId=articles[0].id;
+}
+function activeArticle(){return articles.find(function(a){return a.id===activeArticleId})||articles[0]}
+var manager=document.createElement('section');
+manager.className='article-manager';
+manager.innerHTML='<div class="article-manager-head"><span class="article-manager-title">📚 我的文章</span><button type="button" id="newArticleBtn" class="s">＋ 新增文章</button></div><div id="articleTabs" class="article-tabs"></div><input id="articleTitleInput" class="article-title-input" aria-label="文章標題" placeholder="輸入這篇文章的標題"><div id="articleStatus" class="article-status" aria-live="polite">每篇文章會自動分開保存</div>';
+var editorCard=t.parentNode;
+editorCard.parentNode.insertBefore(manager,editorCard);
+var tabsEl=manager.querySelector('#articleTabs');
+var titleInput=manager.querySelector('#articleTitleInput');
+var statusEl=manager.querySelector('#articleStatus');
+function persistArticles(){
+  try{
+    localStorage.setItem(ARTICLE_KEY,JSON.stringify(articles));
+    localStorage.setItem(ACTIVE_KEY,activeArticleId);
+    statusEl.textContent='✓ 已自動保存｜'+new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){statusEl.textContent='無法保存：請確認瀏覽器沒有停用網站儲存空間。'}
+}
+function save(){
+  var a=activeArticle();if(!a)return;
+  a.text=t.value;a.updatedAt=Date.now();
+  persistArticles();
+}
+function renderArticleTabs(){
+  tabsEl.innerHTML='';
+  articles.forEach(function(a,index){
+    var b=document.createElement('button');
+    b.type='button';b.className='article-tab'+(a.id===activeArticleId?' active':'');
+    b.textContent=a.title||('第'+(index+1)+'篇文章');
+    b.title='切換到'+b.textContent;
+    b.onclick=function(){switchArticle(a.id)};
+    tabsEl.appendChild(b);
+  });
+  var current=activeArticle();
+  titleInput.value=current?current.title:'';
+}
+function switchArticle(id){
+  save();
+  activeArticleId=id;
+  var a=activeArticle();
+  t.value=a?a.text:'';
+  renderArticleTabs();
+  persistArticles();
+  t.focus();
+}
+function createArticle(){
+  save();
+  var a=makeArticle('第'+(articles.length+1)+'篇文章','');
+  articles.push(a);activeArticleId=a.id;
+  t.value='';
+  renderArticleTabs();persistArticles();t.focus();
+}
+titleInput.addEventListener('input',function(){
+  var a=activeArticle();if(!a)return;
+  a.title=titleInput.value.trim()||'未命名文章';
+  renderArticleTabs();persistArticles();
+  titleInput.focus();titleInput.setSelectionRange(titleInput.value.length,titleInput.value.length);
+});
+manager.querySelector('#newArticleBtn').addEventListener('click',createArticle);
+loadArticles();
+var initialArticle=activeArticle();
+t.value=initialArticle?initialArticle.text:'';
+renderArticleTabs();
+persistArticles();
 
 t.addEventListener('keydown',function(e){
   var comp=e.isComposing||e.key==='Process'||e.keyCode===229;
