@@ -89,7 +89,7 @@ textarea{background:var(--card);line-height:1.7}
 .article-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .article-tools button{font-size:.92rem;padding:8px 12px}
 .article-backup-note{font-size:.82rem;color:var(--sub);margin-top:8px}
-</style>
+.article-title-label{display:block;margin-top:10px;font-weight:800;color:var(--ink);font-size:1rem}</style>
 </head>
 <body>
 <main>
@@ -209,7 +209,7 @@ function loadArticles(){
 function activeArticle(){return articles.find(function(a){return a.id===activeArticleId})||articles[0]}
 var manager=document.createElement('section');
 manager.className='article-manager';
-manager.innerHTML='<div class="article-manager-head"><span class="article-manager-title">📚 我的文章</span><button type="button" id="newArticleBtn" class="s">＋ 新增文章</button></div><div id="articleTabs" class="article-tabs"></div><input id="articleTitleInput" class="article-title-input" aria-label="文章標題" placeholder="輸入這篇文章的標題"><div class="article-tools"><button type="button" id="downloadArticleBtn" class="s">📄 下載這篇 Word</button><button type="button" id="backupArticlesBtn" class="g">💾 備份全部文章</button><button type="button" id="restoreArticlesBtn" class="g">↩️ 還原文章備份</button><input type="file" id="restoreArticlesFile" accept=".json,application/json" hidden></div><div id="articleStatus" class="article-status" aria-live="polite">每篇文章會自動分開保存</div><div class="article-backup-note">建議定期備份；備份檔可用來在其他裝置還原文章。</div>';
+manager.innerHTML='<div class="article-manager-head"><span class="article-manager-title">📚 我的文章</span><button type="button" id="newArticleBtn" class="s">＋ 新增文章</button></div><div id="articleTabs" class="article-tabs"></div><label class="article-title-label" for="articleTitleInput">題目：</label><input id="articleTitleInput" class="article-title-input" aria-label="題目" placeholder="請輸入這篇文章的題目"><div class="article-tools"><button type="button" id="copyArticleBtn" class="s">📋 複製整篇文章</button><button type="button" id="downloadArticleBtn" class="s">📄 下載這篇 Word</button><button type="button" id="backupArticlesBtn" class="g">💾 備份全部文章</button><button type="button" id="restoreArticlesBtn" class="g">↩️ 還原文章備份</button><input type="file" id="restoreArticlesFile" accept=".json,application/json" hidden></div><div id="articleStatus" class="article-status" aria-live="polite">每篇文章會自動分開保存</div><div class="article-backup-note">建議定期備份；備份檔可用來在其他裝置還原文章。</div>';
 var editorCard=t.parentNode;
 editorCard.parentNode.insertBefore(manager,editorCard);
 var tabsEl=manager.querySelector('#articleTabs');
@@ -315,6 +315,24 @@ function restoreAllArticles(file){
   reader.readAsText(file);
 }
 manager.querySelector('#newArticleBtn').addEventListener('click',createArticle);
+manager.querySelector('#copyArticleBtn').addEventListener('click',function(){
+  save();
+  var a=activeArticle();
+  if(!a||!String(a.text||'').trim()){alert('這篇文章目前沒有內容可以複製喔！');return}
+  var content=String(a.text);
+  function copied(){statusEl.textContent='✓ 已複製「'+(a.title||'未命名文章')+'」全文，可以貼上使用。';}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(content).then(copied).catch(function(){fallbackCopy(content)});
+  }else{fallbackCopy(content)}
+  function fallbackCopy(value){
+    var area=document.createElement('textarea');area.value=value;
+    area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);
+    area.focus();area.select();
+    try{if(document.execCommand('copy'))copied();else alert('瀏覽器不允許自動複製，請手動選取文章文字。')}
+    catch(e){alert('複製未成功，請手動選取文章文字。')}
+    area.remove();
+  }
+});
 manager.querySelector('#downloadArticleBtn').addEventListener('click',function(){save();downloadOneArticle(activeArticle())});
 manager.querySelector('#backupArticlesBtn').addEventListener('click',backupAllArticles);
 manager.querySelector('#restoreArticlesBtn').addEventListener('click',function(){manager.querySelector('#restoreArticlesFile').click()});
