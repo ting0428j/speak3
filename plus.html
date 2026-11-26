@@ -180,9 +180,9 @@ function lastSentence(){
 }
 function sentenceFromCursor(){
   var pos=typeof t.selectionStart==='number'?t.selectionStart:t.value.length;
-  var rest=t.value.slice(pos).replace(/^\\s+/,'');
+  var rest=t.value.slice(pos).replace(/^\s+/,'');
   if(!rest)return '';
-  var end=rest.search(/[。！？!?\\n]/);
+  var end=rest.search(/[。！？!?\n]/);
   if(end===-1)return rest.trim();
   return rest.slice(0,end+1).trim();
 }
