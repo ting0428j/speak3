@@ -102,6 +102,7 @@ textarea{background:var(--card);line-height:1.7}
 <button id="bs">🔊 念這一句</button>
 <button id="ba" class="s">📖 念全文</button>
 <button id="bx" class="g">⏹ 停止</button>
+<button id="bcopy" class="s">📋 複製文章</button>
 <button id="bw" class="s">📄 下載 Word 檔</button>
 <button id="bc" class="g">🗑 清除</button>
 </div>
@@ -173,9 +174,17 @@ function speakSyllable(base,tone){
   say(base.split('').map(function(z){return NAME[z]||''}).join('，'));
 }
 function lastSentence(){
-  var m=t.value.match(/[^。！？!?\n]+[。！？!?]?/g);
+  var m=t.value.match(/[^。！？!?\\n]+[。！？!?]?/g);
   if(!m)return '';
   return m[m.length-1].trim();
+}
+function sentenceFromCursor(){
+  var pos=typeof t.selectionStart==='number'?t.selectionStart:t.value.length;
+  var rest=t.value.slice(pos).replace(/^\\s+/,'');
+  if(!rest)return '';
+  var end=rest.search(/[。！？!?\\n]/);
+  if(end===-1)return rest.trim();
+  return rest.slice(0,end+1).trim();
 }
 /* ---- 多篇文章：每篇獨立保存，切換分頁不會互相覆蓋 ---- */
 /* 新版使用獨立儲存名稱，避免與原版網站互相影響 */
@@ -263,9 +272,11 @@ function createArticle(){
 }
 titleInput.addEventListener('input',function(){
   var a=activeArticle();if(!a)return;
-  a.title=titleInput.value.trim()||'未命名文章';
-  renderArticleTabs();persistArticles();
-  titleInput.focus();titleInput.setSelectionRange(titleInput.value.length,titleInput.value.length);
+  a.title=titleInput.value||'';
+  /* 只更新目前分頁文字，不重設輸入框，保留原生游標位置 */
+  var activeTab=tabsEl.querySelector('.article-tab.active');
+  if(activeTab)activeTab.textContent=a.title.trim()||'未命名文章';
+  persistArticles();
 });
 function deleteArticle(id){
   if(articles.length<=1){alert('至少保留一篇文章喔！');return}
@@ -315,24 +326,26 @@ function restoreAllArticles(file){
   reader.readAsText(file);
 }
 manager.querySelector('#newArticleBtn').addEventListener('click',createArticle);
-manager.querySelector('#copyArticleBtn').addEventListener('click',function(){
+function copyActiveArticle(){
   save();
   var a=activeArticle();
   if(!a||!String(a.text||'').trim()){alert('這篇文章目前沒有內容可以複製喔！');return}
-  var content=String(a.text);
-  function copied(){statusEl.textContent='✓ 已複製「'+(a.title||'未命名文章')+'」全文，可以貼上使用。';}
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(content).then(copied).catch(function(){fallbackCopy(content)});
-  }else{fallbackCopy(content)}
+  var content=(a.title&&a.title.trim()?'題目：'+a.title.trim()+'\\n\\n':'')+String(a.text);
+  function copied(){statusEl.textContent='✓ 已複製「'+(a.title||'未命名文章')+'」的題目與全文，可以貼上使用。';}
   function fallbackCopy(value){
     var area=document.createElement('textarea');area.value=value;
-    area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);
-    area.focus();area.select();
-    try{if(document.execCommand('copy'))copied();else alert('瀏覽器不允許自動複製，請手動選取文章文字。')}
+    area.style.position='fixed';area.style.left='-9999px';area.style.top='0';
+    document.body.appendChild(area);area.focus();area.select();
+    try{if(document.execCommand('copy'))copied();else alert('複製未成功，請允許瀏覽器使用剪貼簿，或手動選取文章文字。')}
     catch(e){alert('複製未成功，請手動選取文章文字。')}
     area.remove();
   }
-});
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(content).then(copied).catch(function(){fallbackCopy(content)});
+  }else{fallbackCopy(content)}
+}
+manager.querySelector('#copyArticleBtn').addEventListener('click',copyActiveArticle);
+$('bcopy').addEventListener('click',copyActiveArticle);
 manager.querySelector('#downloadArticleBtn').addEventListener('click',function(){save();downloadOneArticle(activeArticle())});
 manager.querySelector('#backupArticlesBtn').addEventListener('click',backupAllArticles);
 manager.querySelector('#restoreArticlesBtn').addEventListener('click',function(){manager.querySelector('#restoreArticlesFile').click()});
@@ -389,7 +402,12 @@ t.addEventListener('input',function(e){
   /* 不是輸入法、直接打出來的句尾符號 */
   if(!e.isComposing&&e.inputType==='insertText'&&/[。！？!?]$/.test(d)&&$('e').checked){setTimeout(function(){say(lastSentence())},60)}
 });
-$('bs').onclick=function(){say(lastSentence());t.focus()};
+$('bs').onclick=function(){
+  var sentence=sentenceFromCursor();
+  if(sentence)say(sentence);
+  else alert('游標後面沒有可朗讀的句子喔！');
+  t.focus();
+};
 $('ba').onclick=function(){
   speechSynthesis.cancel();
   var parts=t.value.split(/(?<=[。！？!?\n])/).map(function(x){return x.trim()}).filter(Boolean);
