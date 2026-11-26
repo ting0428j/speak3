@@ -330,7 +330,7 @@ function copyActiveArticle(){
   save();
   var a=activeArticle();
   if(!a||!String(a.text||'').trim()){alert('這篇文章目前沒有內容可以複製喔！');return}
-  var content=(a.title&&a.title.trim()?'題目：'+a.title.trim()+'\\n\\n':'')+String(a.text);
+  var content=(a.title&&a.title.trim()?'題目：'+a.title.trim()+'\n\n':'')+String(a.text);
   function copied(){statusEl.textContent='✓ 已複製「'+(a.title||'未命名文章')+'」的題目與全文，可以貼上使用。';}
   function fallbackCopy(value){
     var area=document.createElement('textarea');area.value=value;
